@@ -15,6 +15,8 @@ from ultralytics.nn.modules import (
     AIFI,
     C1,
     C2,
+    WaveletDown,  # <--- Add this
+    FreqGate,     # <--- Add this
     C2PSA,
     C3,
     C3TR,
@@ -1602,6 +1604,7 @@ def parse_model(d, ch, verbose=True):
             SCDown,
             C2fCIB,
             A2C2f,
+            WaveletDown,
         }
     )
     repeat_modules = frozenset(  # modules with 'repeat' arguments
