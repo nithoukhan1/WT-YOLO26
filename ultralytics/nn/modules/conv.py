@@ -667,3 +667,68 @@ class Index(nn.Module):
             (torch.Tensor): Selected tensor.
         """
         return x[self.index]
+
+
+# ==========================================
+# WAVE-YOLO26 NOVEL MODULES
+# ==========================================
+
+class WaveletDown(nn.Module):
+    """
+    Wavelet Downsampling Module for Wave-YOLO26.
+    Novelty: Performs lossless frequency decomposition instead of destructive spatial pooling.
+    """
+    def __init__(self, c1, c2):
+        super().__init__()
+        self.c1 = c1
+        # DWT produces 4 sub-bands (LL, LH, HL, HH), so channels increase by 4x.
+        # We use a 1x1 Conv to project 4*c1 -> c2.
+        self.conv = nn.Conv2d(c1 * 4, c2, 1, 1, 0, bias=False)
+        self.bn = nn.BatchNorm2d(c2)
+        self.act = nn.SiLU()
+
+    def forward(self, x):
+        b, c, h, w = x.shape
+        # Handle odd dimensions with padding if necessary
+        if h % 2 != 0 or w % 2 != 0:
+             x = torch.nn.functional.pad(x, (0, 1, 0, 1))
+
+        # Haar Wavelet Decomposition
+        x01 = x[:, :, 0::2, :] / 2
+        x02 = x[:, :, 1::2, :] / 2
+        x1 = x01[:, :, :, 0::2]
+        x2 = x02[:, :, :, 0::2]
+        x3 = x01[:, :, :, 1::2]
+        x4 = x02[:, :, :, 1::2]
+        
+        # Frequency Bands
+        x_LL = x1 + x2 + x3 + x4 # Low-freq (Approximation)
+        x_LH = -x1 + x2 - x3 + x4 # Vertical Edges
+        x_HL = -x1 - x2 + x3 + x4 # Horizontal Edges
+        x_HH = x1 - x2 - x3 + x4 # Diagonal Edges
+        
+        # Concatenate: [Batch, 4*c1, H/2, W/2]
+        out = torch.cat([x_LL, x_LH, x_HL, x_HH], dim=1)
+        
+        return self.act(self.bn(self.conv(out)))
+
+class FreqGate(nn.Module):
+    """
+    Frequency Attention Gate for Wave-YOLO26 Neck.
+    Novelty: Re-weights features to prioritize high-frequency fracture signals 
+    over low-frequency background noise.
+    """
+    def __init__(self, c1):
+        super().__init__()
+        # Lightweight channel attention
+        self.pool = nn.AdaptiveAvgPool2d(1)
+        self.fc = nn.Sequential(
+            nn.Conv2d(c1, c1 // 16, 1, bias=False), 
+            nn.ReLU(),
+            nn.Conv2d(c1 // 16, c1, 1, bias=False), 
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        attn = self.fc(self.pool(x))
+        return x * attn
