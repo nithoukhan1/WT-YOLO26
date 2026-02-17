@@ -62,6 +62,8 @@ from .block import (
 )
 from .conv import (
     CBAM,
+    WaveletDown,
+    FreqGate,
     ChannelAttention,
     Concat,
     Conv,
@@ -187,4 +189,6 @@ __all__ = (
     "YOLOESegment",
     "YOLOESegment26",
     "v10Detect",
+    "WaveletDown",
+    "FreqGate",
 )
