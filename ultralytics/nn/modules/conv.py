@@ -673,6 +673,10 @@ class Index(nn.Module):
 # WAVE-YOLO26 NOVEL MODULES
 # ==========================================
 
+# ==========================================
+# WAVE-YOLO26 NOVEL MODULES (Corrected)
+# ==========================================
+
 class WaveletDown(nn.Module):
     """
     Wavelet Downsampling Module for Wave-YOLO26.
@@ -702,31 +706,45 @@ class WaveletDown(nn.Module):
         x4 = x02[:, :, :, 1::2]
         
         # Frequency Bands
-        x_LL = x1 + x2 + x3 + x4 # Low-freq (Approximation)
-        x_LH = -x1 + x2 - x3 + x4 # Vertical Edges
-        x_HL = -x1 - x2 + x3 + x4 # Horizontal Edges
-        x_HH = x1 - x2 - x3 + x4 # Diagonal Edges
+        x_LL = x1 + x2 + x3 + x4 # Low-freq
+        x_LH = -x1 + x2 - x3 + x4 # Vertical
+        x_HL = -x1 - x2 + x3 + x4 # Horizontal
+        x_HH = x1 - x2 - x3 + x4 # Diagonal
         
         # Concatenate: [Batch, 4*c1, H/2, W/2]
         out = torch.cat([x_LL, x_LH, x_HL, x_HH], dim=1)
         
         return self.act(self.bn(self.conv(out)))
 
+
 class FreqGate(nn.Module):
     """
-    Frequency Attention Gate for Wave-YOLO26.
+    Frequency Attention Gate for Wave-YOLO26 Neck.
+    Novelty: Projects channels to match model scale and applies attention.
+    Fixes: 'RuntimeError: weight of size [128, 128]... got 384 channels'
     """
-    def __init__(self, c1, c2=None): # <--- MODIFIED: Accepts c2 (ignored)
+    def __init__(self, c1, c2):
         super().__init__()
-        # c1 is the input channels (automatically scaled by YOLO)
+        # 1. Projection: If input channels (c1) != output channels (c2), resize them.
+        #    This is CRITICAL for the Neck where Concat layers increase channel count.
+        if c1 != c2:
+            self.project = nn.Conv2d(c1, c2, 1, 1, bias=False)
+        else:
+            self.project = nn.Identity()
+            
+        # 2. Attention: Operates on the targeted output channels (c2)
         self.pool = nn.AdaptiveAvgPool2d(1)
         self.fc = nn.Sequential(
-            nn.Conv2d(c1, c1 // 16, 1, bias=False), 
+            nn.Conv2d(c2, c2 // 16, 1, bias=False), 
             nn.ReLU(),
-            nn.Conv2d(c1 // 16, c1, 1, bias=False), 
+            nn.Conv2d(c2 // 16, c2, 1, bias=False), 
             nn.Sigmoid()
         )
 
     def forward(self, x):
+        # Apply projection first (e.g., 384 -> 128)
+        x = self.project(x)
+        
+        # Apply attention
         attn = self.fc(self.pool(x))
         return x * attn
