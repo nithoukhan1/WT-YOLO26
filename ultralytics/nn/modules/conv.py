@@ -714,13 +714,11 @@ class WaveletDown(nn.Module):
 
 class FreqGate(nn.Module):
     """
-    Frequency Attention Gate for Wave-YOLO26 Neck.
-    Novelty: Re-weights features to prioritize high-frequency fracture signals 
-    over low-frequency background noise.
+    Frequency Attention Gate for Wave-YOLO26.
     """
-    def __init__(self, c1):
+    def __init__(self, c1, c2=None): # <--- MODIFIED: Accepts c2 (ignored)
         super().__init__()
-        # Lightweight channel attention
+        # c1 is the input channels (automatically scaled by YOLO)
         self.pool = nn.AdaptiveAvgPool2d(1)
         self.fc = nn.Sequential(
             nn.Conv2d(c1, c1 // 16, 1, bias=False), 

@@ -1605,6 +1605,7 @@ def parse_model(d, ch, verbose=True):
             C2fCIB,
             A2C2f,
             WaveletDown,
+            FreqGate,
         }
     )
     repeat_modules = frozenset(  # modules with 'repeat' arguments
