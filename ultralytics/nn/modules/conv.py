@@ -673,27 +673,24 @@ class Index(nn.Module):
 # WAVE-YOLO26 NOVEL MODULES
 # ==========================================
 
-# ==========================================
-# WAVE-YOLO26 NOVEL MODULES (Corrected)
-# ==========================================
+# Place this at the bottom of ultralytics/nn/modules/conv.py
 
 class WaveletDown(nn.Module):
     """
     Wavelet Downsampling Module for Wave-YOLO26.
-    Novelty: Performs lossless frequency decomposition instead of destructive spatial pooling.
+    Novelty: Performs lossless frequency decomposition.
     """
     def __init__(self, c1, c2):
         super().__init__()
         self.c1 = c1
-        # DWT produces 4 sub-bands (LL, LH, HL, HH), so channels increase by 4x.
-        # We use a 1x1 Conv to project 4*c1 -> c2.
+        # 1x1 Conv to compress the 4x expansion from Wavelet decomposition
         self.conv = nn.Conv2d(c1 * 4, c2, 1, 1, 0, bias=False)
         self.bn = nn.BatchNorm2d(c2)
         self.act = nn.SiLU()
 
     def forward(self, x):
         b, c, h, w = x.shape
-        # Handle odd dimensions with padding if necessary
+        # Handle odd dimensions
         if h % 2 != 0 or w % 2 != 0:
              x = torch.nn.functional.pad(x, (0, 1, 0, 1))
 
@@ -705,13 +702,13 @@ class WaveletDown(nn.Module):
         x3 = x01[:, :, :, 1::2]
         x4 = x02[:, :, :, 1::2]
         
-        # Frequency Bands
-        x_LL = x1 + x2 + x3 + x4 # Low-freq
-        x_LH = -x1 + x2 - x3 + x4 # Vertical
-        x_HL = -x1 - x2 + x3 + x4 # Horizontal
-        x_HH = x1 - x2 - x3 + x4 # Diagonal
+        # Frequency Bands: LL, LH, HL, HH
+        x_LL = x1 + x2 + x3 + x4
+        x_LH = -x1 + x2 - x3 + x4
+        x_HL = -x1 - x2 + x3 + x4
+        x_HH = x1 - x2 - x3 + x4
         
-        # Concatenate: [Batch, 4*c1, H/2, W/2]
+        # Concatenate frequency bands
         out = torch.cat([x_LL, x_LH, x_HL, x_HH], dim=1)
         
         return self.act(self.bn(self.conv(out)))
@@ -720,31 +717,32 @@ class WaveletDown(nn.Module):
 class FreqGate(nn.Module):
     """
     Frequency Attention Gate for Wave-YOLO26 Neck.
-    Novelty: Projects channels to match model scale and applies attention.
-    Fixes: 'RuntimeError: weight of size [128, 128]... got 384 channels'
+    Novelty: Projects channels (if needed) and re-weights high-frequency features.
     """
     def __init__(self, c1, c2):
         super().__init__()
-        # 1. Projection: If input channels (c1) != output channels (c2), resize them.
-        #    This is CRITICAL for the Neck where Concat layers increase channel count.
+        # CRITICAL FIX: Project channels if input (c1) doesn't match output (c2)
+        # This handles the Neck concatenation (e.g., 384 input -> 128 target)
         if c1 != c2:
-            self.project = nn.Conv2d(c1, c2, 1, 1, bias=False)
+            self.conv = nn.Conv2d(c1, c2, 1, 1, bias=False)
+            self.c = c2
         else:
-            self.project = nn.Identity()
-            
-        # 2. Attention: Operates on the targeted output channels (c2)
+            self.conv = nn.Identity()
+            self.c = c1
+
+        # Attention Mechanism (Squeeze-and-Excitation style)
         self.pool = nn.AdaptiveAvgPool2d(1)
         self.fc = nn.Sequential(
-            nn.Conv2d(c2, c2 // 16, 1, bias=False), 
+            nn.Conv2d(self.c, self.c // 16, 1, bias=False), 
             nn.ReLU(),
-            nn.Conv2d(c2 // 16, c2, 1, bias=False), 
+            nn.Conv2d(self.c // 16, self.c, 1, bias=False), 
             nn.Sigmoid()
         )
 
     def forward(self, x):
-        # Apply projection first (e.g., 384 -> 128)
-        x = self.project(x)
+        # 1. Project channels (Squash 384 -> 128)
+        x = self.conv(x)
         
-        # Apply attention
+        # 2. Apply Attention
         attn = self.fc(self.pool(x))
         return x * attn
