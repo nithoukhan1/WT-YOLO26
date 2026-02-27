@@ -420,13 +420,13 @@ def get_flops(model, imgsz=640):
             # Method 1: Use stride-based input tensor
             stride = max(int(model.stride.max()), 32) if hasattr(model, "stride") else 32  # max stride
             # FIX: Hardcode 3 channels instead of p.shape[1] to support custom layers like WaveletDown
-            im = torch.empty((1, 3, stride, stride), device=p.device)  
+            im = torch.empty((1, 3, stride, stride), device=p.device)
             flops = thop.profile(deepcopy(model), inputs=[im], verbose=False)[0] / 1e9 * 2  # stride GFLOPs
             return flops * imgsz[0] / stride * imgsz[1] / stride  # imgsz GFLOPs
         except Exception:
             # Method 2: Use actual image size (required for RTDETR models)
             # FIX: Hardcode 3 channels instead of p.shape[1]
-            im = torch.empty((1, 3, *imgsz), device=p.device)  
+            im = torch.empty((1, 3, *imgsz), device=p.device)
             return thop.profile(deepcopy(model), inputs=[im], verbose=False)[0] / 1e9 * 2  # imgsz GFLOPs
     except Exception:
         return 0.0
@@ -452,7 +452,7 @@ def get_flops_with_torch_profiler(model, imgsz=640):
         # Use stride size for input tensor
         stride = (max(int(model.stride.max()), 32) if hasattr(model, "stride") else 32) * 2  # max stride
         # FIX: Hardcode 3 channels instead of p.shape[1]
-        im = torch.empty((1, 3, stride, stride), device=p.device)  
+        im = torch.empty((1, 3, stride, stride), device=p.device)
         with torch.profiler.profile(with_flops=True) as prof:
             model(im)
         flops = sum(x.flops for x in prof.key_averages()) / 1e9
@@ -460,11 +460,12 @@ def get_flops_with_torch_profiler(model, imgsz=640):
     except Exception:
         # Use actual image size for input tensor (i.e. required for RTDETR models)
         # FIX: Hardcode 3 channels instead of p.shape[1]
-        im = torch.empty((1, 3, *imgsz), device=p.device)  
+        im = torch.empty((1, 3, *imgsz), device=p.device)
         with torch.profiler.profile(with_flops=True) as prof:
             model(im)
         flops = sum(x.flops for x in prof.key_averages()) / 1e9
     return flops
+
 
 def initialize_weights(model):
     """Initialize model weights, biases, and module settings to default values."""
