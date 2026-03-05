@@ -62,8 +62,6 @@ from .block import (
 )
 from .conv import (
     CBAM,
-    WaveletDown,
-    FreqGate,
     ChannelAttention,
     Concat,
     Conv,
@@ -72,11 +70,13 @@ from .conv import (
     DWConv,
     DWConvTranspose2d,
     Focus,
+    FreqGate,
     GhostConv,
     Index,
     LightConv,
     RepConv,
     SpatialAttention,
+    WaveletDown,
 )
 from .head import (
     OBB,
@@ -155,6 +155,7 @@ __all__ = (
     "DeformableTransformerDecoderLayer",
     "Detect",
     "Focus",
+    "FreqGate",
     "GhostBottleneck",
     "GhostConv",
     "HGBlock",
@@ -184,11 +185,10 @@ __all__ = (
     "TransformerBlock",
     "TransformerEncoderLayer",
     "TransformerLayer",
+    "WaveletDown",
     "WorldDetect",
     "YOLOEDetect",
     "YOLOESegment",
     "YOLOESegment26",
     "v10Detect",
-    "WaveletDown",
-    "FreqGate",
 )
