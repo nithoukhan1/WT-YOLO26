@@ -15,8 +15,6 @@ from ultralytics.nn.modules import (
     AIFI,
     C1,
     C2,
-    WaveletDown,  # <--- Add this
-    FreqGate,     # <--- Add this
     C2PSA,
     C3,
     C3TR,
@@ -50,6 +48,7 @@ from ultralytics.nn.modules import (
     DWConv,
     DWConvTranspose2d,
     Focus,
+    FreqGate,  # <--- Add this
     GhostBottleneck,
     GhostConv,
     HGBlock,
@@ -69,6 +68,7 @@ from ultralytics.nn.modules import (
     Segment,
     Segment26,
     TorchVision,
+    WaveletDown,  # <--- Add this
     WorldDetect,
     YOLOEDetect,
     YOLOESegment,
