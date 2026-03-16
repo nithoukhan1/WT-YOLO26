@@ -675,11 +675,11 @@ class Index(nn.Module):
 
 # Place this at the bottom of ultralytics/nn/modules/conv.py
 
+
 class WaveletDown(nn.Module):
+    """Wavelet Downsampling Module for Wave-YOLO26. Novelty: Performs lossless frequency decomposition.
     """
-    Wavelet Downsampling Module for Wave-YOLO26.
-    Novelty: Performs lossless frequency decomposition.
-    """
+
     def __init__(self, c1, c2):
         super().__init__()
         self.c1 = c1
@@ -689,10 +689,10 @@ class WaveletDown(nn.Module):
         self.act = nn.SiLU()
 
     def forward(self, x):
-        b, c, h, w = x.shape
+        _b, _c, h, w = x.shape
         # Handle odd dimensions
         if h % 2 != 0 or w % 2 != 0:
-             x = torch.nn.functional.pad(x, (0, 1, 0, 1))
+            x = torch.nn.functional.pad(x, (0, 1, 0, 1))
 
         # Haar Wavelet Decomposition
         x01 = x[:, :, 0::2, :] / 2
@@ -701,24 +701,24 @@ class WaveletDown(nn.Module):
         x2 = x02[:, :, :, 0::2]
         x3 = x01[:, :, :, 1::2]
         x4 = x02[:, :, :, 1::2]
-        
+
         # Frequency Bands: LL, LH, HL, HH
         x_LL = x1 + x2 + x3 + x4
         x_LH = -x1 + x2 - x3 + x4
         x_HL = -x1 - x2 + x3 + x4
         x_HH = x1 - x2 - x3 + x4
-        
+
         # Concatenate frequency bands
         out = torch.cat([x_LL, x_LH, x_HL, x_HH], dim=1)
-        
+
         return self.act(self.bn(self.conv(out)))
 
 
 class FreqGate(nn.Module):
+    """Frequency Attention Gate for Wave-YOLO26 Neck. Novelty: Projects channels (if needed) and re-weights
+    high-frequency features.
     """
-    Frequency Attention Gate for Wave-YOLO26 Neck.
-    Novelty: Projects channels (if needed) and re-weights high-frequency features.
-    """
+
     def __init__(self, c1, c2):
         super().__init__()
         # CRITICAL FIX: Project channels if input (c1) doesn't match output (c2)
@@ -733,16 +733,16 @@ class FreqGate(nn.Module):
         # Attention Mechanism (Squeeze-and-Excitation style)
         self.pool = nn.AdaptiveAvgPool2d(1)
         self.fc = nn.Sequential(
-            nn.Conv2d(self.c, self.c // 16, 1, bias=False), 
+            nn.Conv2d(self.c, self.c // 16, 1, bias=False),
             nn.ReLU(),
-            nn.Conv2d(self.c // 16, self.c, 1, bias=False), 
-            nn.Sigmoid()
+            nn.Conv2d(self.c // 16, self.c, 1, bias=False),
+            nn.Sigmoid(),
         )
 
     def forward(self, x):
         # 1. Project channels (Squash 384 -> 128)
         x = self.conv(x)
-        
+
         # 2. Apply Attention
         attn = self.fc(self.pool(x))
         return x * attn
